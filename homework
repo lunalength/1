@@ -1,0 +1,88 @@
+import streamlit as st
+import sqlite3
+from hashlib import sha256
+
+# Function to hash passwords
+def hash_password(password):
+    return sha256(password.encode()).hexdigest()
+
+# Function to create database connection
+def create_connection(db_file):
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+    except sqlite3.Error as e:
+        print(e)
+    return conn
+
+# Function to create table if not exists
+def create_table(conn):
+    sql_create_table = """
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY,
+        first_name TEXT NOT NULL,
+        last_name TEXT NOT NULL,
+        year_of_birth INTEGER NOT NULL,
+        gender TEXT NOT NULL,
+        username TEXT NOT NULL,
+        email TEXT NOT NULL,
+        password TEXT NOT NULL
+    );
+    """
+    try:
+        c = conn.cursor()
+        c.execute(sql_create_table)
+    except sqlite3.Error as e:
+        print(e)
+
+# Function to insert user into database
+def insert_user(conn, user):
+    sql_insert_user = """
+    INSERT INTO users (first_name, last_name, year_of_birth, gender, username, email, password)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """
+    cur = conn.cursor()
+    cur.execute(sql_insert_user, user)
+    conn.commit()
+    return cur.lastrowid
+
+# Main function
+def main():
+    # Create database connection
+    conn = create_connection("user_database.db")
+    if conn is not None:
+        # Create table if not exists
+        create_table(conn)
+    else:
+        st.error("Error: Unable to connect to database.")
+
+    st.title("User Registration Form")
+
+    # Form inputs
+    first_name = st.text_input("First Name")
+    last_name = st.text_input("Last Name")
+    year_of_birth = st.number_input("Year of Birth", min_value=1900, max_value=2022)
+    gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+    username = st.text_input("Username")
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    confirm_password = st.text_input("Confirm Password", type="password")
+
+    # Validate form submission
+    if st.button("Register"):
+        if not (first_name and last_name and username and email and password and confirm_password):
+            st.error("All fields are required.")
+        elif password != confirm_password:
+            st.error("Passwords do not match.")
+        else:
+            # Hash password
+            hashed_password = hash_password(password)
+
+            # Insert user into database
+            user_data = (first_name, last_name, year_of_birth, gender, username, email, hashed_password)
+            user_id = insert_user(conn, user_data)
+
+            st.success("Registration successful. User ID: {}".format(user_id))
+
+if __name__ == "__main__":
+    main()
